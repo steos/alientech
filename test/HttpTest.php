@@ -27,7 +27,7 @@ class HttpTest extends TestCase  {
         }
         return Effect::success(None::get());
     }
-    function testDispatch() {
+    function testSimpleGetRequestDispatch() {
         $request = Request::create('http://example.com/foo/123');
         $request->headers->set('Accept', 'application/json');
         $routes = [
