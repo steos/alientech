@@ -55,4 +55,8 @@ final class Success implements Result {
     function bimap(callable $f, callable $g): self {
         return self::of(call_user_func($g, $this->success));
     }
+
+    function fold(callable $f, callable $g) {
+        return call_user_func($g, $this->success);
+    }
 }

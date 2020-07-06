@@ -18,6 +18,11 @@ interface Result {
     /**
      * @return mixed
      */
+    function fold(callable $f, callable $g);
+
+    /**
+     * @return mixed
+     */
     function getOrElse(callable $f);
 
     /**
