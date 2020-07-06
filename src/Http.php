@@ -52,10 +52,8 @@ class Http
     static function unsafePerformDispatch(Request $request, array $routes): Response {
         return self::dispatch($request, $routes)
             ->unsafePerformEffect()
-            ->chainFailure(fn($err) => Success::of(
-                new Response('Internal Server Error',
-                Response::HTTP_INTERNAL_SERVER_ERROR)))
-            ->unsafeGet();
+            ->getWithDefault(new Response('Internal Server Error',
+                Response::HTTP_INTERNAL_SERVER_ERROR));
     }
 
     static private function runWebmachine(Resource $resource, Request $request): Response {
