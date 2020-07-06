@@ -1,0 +1,15 @@
+{
+    "require": {
+        "psr/http-message": "^1.0",
+        "guzzlehttp/guzzle": "^7.0",
+        "phpunit/phpunit": "^9.2",
+        "ext-json": "*",
+        "steos/restmachine": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {"AlienTech\\": "src/"}
+    },
+    "autoload-dev": {
+        "psr-4": {"AlienTech\\": "test/"}
+    }
+}
