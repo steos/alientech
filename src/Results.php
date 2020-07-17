@@ -21,4 +21,8 @@ class Results
     static function fromTruthy($x): Result {
         return $x ? Success::of($x) : Failure::of($x);
     }
+
+    static function wrapSuccess($x): Result {
+        return $x instanceof Result ? $x : Success::of($x);
+    }
 }
