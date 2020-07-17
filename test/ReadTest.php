@@ -62,11 +62,11 @@ class ReadTest extends TestCase
             'lorem' => ['abc', 'xyz']
         ];
         $result = Read::newInstance(ReadTestBar::class, $input, [
-            'bar' => Read::path(['lorem', 1]),
-            'foo' => Read::instance('quux',ReadTestFoo::class, [
-                'foo' => Read::key('a'),
-                'bar' => Read::key('b'),
-            ])
+            'bar' => Read::fieldPath(['lorem', 1]),
+            'foo' => Read::field('quux', Read::instance([
+                'foo' => Read::field('a'),
+                'bar' => Read::field('b'),
+            ]))
         ]);
         $this->assertSuccess($result);
         /** @var ReadTestBar $x */
@@ -84,8 +84,8 @@ class ReadTest extends TestCase
         ];
         $result = Read::newInstance(ReadTestBar::class, $input, [
             'foo' => [
-                'foo' => Read::key('a'),
-                'bar' => Read::key('b'),
+                'foo' => Read::field('a'),
+                'bar' => Read::field('b'),
             ]
         ]);
         $this->assertSuccess($result);
@@ -95,4 +95,11 @@ class ReadTest extends TestCase
         $this->assertFalse($x->foo->bar);
     }
 
+    function testBuiltinTypeMismatch() {
+        $result = Read::newInstance(ReadTestFoo::class, [
+            'foo' => 'hey',
+            'bar' => 42
+        ]);
+        $this->assertTrue($result->isFailure());
+    }
 }

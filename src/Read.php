@@ -5,59 +5,71 @@ declare(strict_types=1);
 namespace AlienTech;
 
 class Read {
-    static function instanceReader($className) {
-        return fn(array $props) => Read::newInstance($className, $props);
+
+    static function field(string $key, ?callable $f = null) {
+        return fn(array $xs, \ReflectionProperty $prop) => $f ? call_user_func($f, @$xs[$key], $prop) : @$xs[$key];
     }
 
-    static function key(string $key) {
-        return fn(array $xs) => @$xs[$key];
-    }
-
-    static function path(array $path) {
+    static function fieldPath(array $path, ?callable $f = null) {
         if (count($path) < 2) {
             throw new \InvalidArgumentException();
         }
-        return function(array $xs) use ($path) {
+        return function(array $xs, \ReflectionProperty $prop) use ($path, $f) {
             $head = array_shift($path);
             $x = $xs[$head];
             foreach ($path as $segment) {
                 $x = $x[$segment];
             }
-            return $x;
+            return $f ? call_user_func($f, $x, $prop) : $x;
         };
     }
 
-    static function instance(string $key, string $className, array $readers = []) {
-        return fn(array $props) => Read::newInstance($className, @$props[$key], $readers);
+    static function instance(array $readers = []) {
+        return fn(array $props, \ReflectionProperty $prop) => self::newInstance($prop->getType()->getName(), $props, $readers);
     }
 
-    static function getReader(\ReflectionProperty $prop, array $readers) {
+    static function getReader(\ReflectionProperty $prop, array $readers): Result {
         $reader = @$readers[$prop->getName()];
         if (is_callable($reader)) {
-            return $reader;
+            return Success::of($reader);
         }
         $type = $prop->getType();
-        if (!$type) {
-            return self::key($prop->getName());
+        if (!$type || $type->isBuiltin()) {
+            return Success::of(self::field($prop->getName()));
         }
-        if ($type->isBuiltin()) {
-            return self::key($prop->getName());
-        } else {
-            return self::instance($prop->getName(), $type->getName(), @$readers[$prop->getName()] ?? []);
+        if (!($type instanceof \ReflectionNamedType)) {
+            return Failure::of("type of property {$prop->getName()} is not a named type");
         }
+        return Success::of(self::field($prop->getName(), self::instance(@$readers[$prop->getName()] ?? [])));
     }
 
-    static function readInstance($inst, \ReflectionClass $class, array $propValues, array $readers) {
+    static function readInstanceProps($inst, \ReflectionClass $class, array $propValues, array $readers): Result {
         foreach ($class->getProperties() as $prop) {
             if ($prop->isStatic()) continue;
-            $reader = self::getReader($prop, $readers);
-            $result = Results::wrapSuccess(call_user_func($reader, $propValues));
+            $result = self::getReader($prop, $readers)->chain(fn($reader) =>
+                Results::wrapSuccess(call_user_func($reader, $propValues, $prop)));
             if ($result->isFailure()) {
                 return $result;
             }
             $prop->setAccessible(true);
             try {
-                $prop->setValue($inst, $result->unsafeGet());
+                $value = $result->unsafeGet();
+                $type = $prop->getType();
+                if ($type && $type->isBuiltin() && $type instanceof \ReflectionNamedType) {
+                    $typeNameMap = [
+                        'bool' => 'boolean',
+                        'int' => 'integer'
+                    ];
+                    $valueTypeName = gettype($value);
+                    $propTypeName = $type->getName();
+                    $propTypeNameNormalized = $typeNameMap[$propTypeName] ?? $propTypeName;
+                    if ($valueTypeName === 'NULL' && !$type->allowsNull()) {
+                        return Failure::of("property {$prop->getName()} is not nullable but value is null");
+                    } else if ($valueTypeName !== 'NULL' && $valueTypeName !== $propTypeNameNormalized) {
+                        return Failure::of("property {$prop->getName()} expects type $propTypeNameNormalized but value has type $valueTypeName");
+                    }
+                }
+                $prop->setValue($inst, $value);
             } catch (\TypeError $err) {
                 return Failure::of($err->getMessage());
             }
@@ -69,7 +81,7 @@ class Read {
         return Results::fromTryCatch(fn() => new \ReflectionClass($className))
             ->chain(fn(\ReflectionClass $class) =>
             Results::fromTryCatch(fn() => $class->newInstance())
-                ->chain(fn($inst) => self::readInstance($inst, $class, $propValues, $readers)));
+                ->chain(fn($inst) => self::readInstanceProps($inst, $class, $propValues, $readers)));
     }
 
 }
